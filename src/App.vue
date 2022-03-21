@@ -330,9 +330,10 @@ export default {
             "/src/assets/resource/person.glb",
             (person) => {
               console.log(person);
-              person.scene.position.x = 0.3;
-              person.scene.position.z = 1.6;
+              person.scene.position.x = 16.3;
+              person.scene.position.z = 16.6;
               person.scene.position.y = 2.36;
+              person.scene.scale.set( 20, 20, 20 );
               person.scene.castShadow = true;
               instance.person = person.scene;
 
@@ -357,6 +358,7 @@ export default {
                 )
               );
               gltf.scene.castShadow = true;
+              gltf.scene.scale.set( 5, 5, 5 );
               scene.add(gltf.scene);
 
               resolve();
