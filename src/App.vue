@@ -50,7 +50,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
+// import snowTexture from "./assets/logo.png";
 import snowTexture from "./assets/resource/snow.png";
+import Cloud from "./components/Cloud";
 
 import Stats from "stats.js";
 // 控制组件
@@ -251,6 +253,18 @@ export default {
 
       scene.add(instance.points);
 
+      const renderClound = () => {
+        instance.clouds = new Array(100).fill("").map((item) => {
+          const cloud = new Cloud();
+
+          cloud.setPosition(Math.random() * 30, 70, Math.random() * 50);
+          cloud.setRotation(1.16, -0.12, Math.random() * 360);
+          scene.add(cloud.instance);
+          return cloud;
+        });
+      };
+      instance.renderClound = renderClound;
+      renderClound();
       // 中央
       // camera.lookAt(new Vector3(0, 0, 0));
       camera.lookAt(scene.position);
@@ -296,6 +310,11 @@ export default {
 
           // 顶点变动之后需要更新，否则无法实现雨滴特效
           instance.points.geometry.verticesNeedUpdate = true;
+
+          // 云层动画
+          instance.clouds.forEach((cloud) => {
+            cloud.animate();
+          });
         };
         stats.begin();
         animate();
@@ -333,7 +352,7 @@ export default {
               person.scene.position.x = 16.3;
               person.scene.position.z = 16.6;
               person.scene.position.y = 2.36;
-              person.scene.scale.set( 20, 20, 20 );
+              person.scene.scale.set(20, 20, 20);
               person.scene.castShadow = true;
               instance.person = person.scene;
 
@@ -358,7 +377,7 @@ export default {
                 )
               );
               gltf.scene.castShadow = true;
-              gltf.scene.scale.set( 5, 5, 5 );
+              gltf.scene.scale.set(5, 5, 5);
               scene.add(gltf.scene);
 
               resolve();
