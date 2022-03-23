@@ -22,9 +22,13 @@ import {
   BoxGeometry,
   IcosahedronBufferGeometry,
   SphereGeometry,
+  ExtrudeGeometry,
   MeshStandardMaterial,
   Color,
   AdditiveBlending,
+  LineBasicMaterial,
+  Shape,
+  Line,
   // 光源
   SpotLight,
   PointLight,
@@ -38,6 +42,7 @@ import {
   WebGLRenderer,
   Clock,
   TextureLoader,
+  FileLoader,
 } from "three";
 
 import { TWEEN } from "three/examples/jsm/libs/tween.module.min.js";
@@ -49,6 +54,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+let loader = new FileLoader();
 
 // import snowTexture from "./assets/logo.png";
 import snowTexture from "./assets/resource/snow.png";
@@ -70,6 +76,77 @@ export default {
     const instance = getCurrentInstance();
     console.log("instance", instance);
 
+    const initMap = (chinaJson) => {
+      // 建一个空对象存放对象
+      instance.map = new Object3D();
+
+      // 墨卡托投影转换
+      const projection = d3
+        .geoMercator()
+        .center([104.0, 37.5])
+        .scale(80)
+        .translate([0, 0]);
+
+      chinaJson.features.forEach((elem) => {
+        // 定一个省份3D对象
+        const province = new Object3D();
+
+        // 每个的 坐标 数组
+        const coordinates = elem.geometry.coordinates;
+        // 循环坐标数组
+        coordinates.forEach((multiPolygon) => {
+          multiPolygon.forEach((polygon) => {
+            const shape = new Shape();
+            const lineMaterial = new LineBasicMaterial({
+              color: "white",
+            });
+            const lineGeometry = new Geometry();
+
+            for (let i = 0; i < polygon.length; i++) {
+              const [x, y] = projection(polygon[i]);
+              if (i === 0) {
+                shape.moveTo(x, -y);
+              }
+              shape.lineTo(x, -y);
+              lineGeometry.vertices.push(new Vector3(x, -y, 4.01));
+            }
+
+            const extrudeSettings = {
+              depth: 4,
+              bevelEnabled: false,
+            };
+
+            const geometry = new ExtrudeGeometry(shape, extrudeSettings);
+            const material = new MeshBasicMaterial({
+              color: "#02A1E2",
+              transparent: true,
+              opacity: 0.6,
+            });
+            const material1 = new MeshBasicMaterial({
+              color: "#3480C4",
+              transparent: true,
+              opacity: 0.5,
+            });
+            const mesh = new Mesh(geometry, [material, material1]);
+            const line = new Line(lineGeometry, lineMaterial);
+            province.add(mesh);
+            province.add(line);
+          });
+        });
+
+        // 将geo的属性放到省份模型中
+        province.properties = elem.properties;
+        if (elem.properties.contorid) {
+          const [x, y] = projection(elem.properties.contorid);
+          province.properties._centroid = [x, y];
+        }
+
+        instance.map.add(province);
+
+        return instance.map;
+      });
+    };
+
     // 帧率
     const initStats = () => {
       const stats = new Stats();
@@ -82,7 +159,7 @@ export default {
       return stats;
     };
 
-    const Options = function() {
+    const Options = function () {
       this.radius = 20;
       this.snow = 500;
     };
@@ -266,6 +343,14 @@ export default {
       };
       instance.renderClound = renderClound;
       renderClound();
+
+      // const proviceMap = new GunagDongMap();
+      // setTimeout(() => {
+      //   console.log("proviceMap", proviceMap);
+
+      //   scene.add(proviceMap.map);
+      // }, 3000);
+
       // 中央
       // camera.lookAt(new Vector3(0, 0, 0));
       camera.lookAt(scene.position);
@@ -302,7 +387,7 @@ export default {
           // 雪花动画
           let vertices = instance.points.geometry.vertices;
 
-          vertices.forEach(function(v) {
+          vertices.forEach(function (v) {
             v.y = v.y - v.velocityY;
             v.x = v.x - v.velocityX;
             if (v.y <= 0) v.y = 60;
@@ -363,7 +448,7 @@ export default {
 
               resolve();
             },
-            function(xhr) {
+            function (xhr) {
               console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
             }
           );
@@ -385,15 +470,29 @@ export default {
 
               resolve();
             },
-            function(xhr) {
+            function (xhr) {
               console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
             }
           );
         });
 
-      Promise.all([loadPersonResource(), loadBuildResource()]).then((res) => {
-        rendererSecee();
-      });
+      const loadMap = () =>
+        new Promise((resolve) => {
+          loader.load("/src/assets/map/guangdong.json", (data) => {
+            let jsonData = JSON.parse(data);
+            console.log("instance", instance);
+            // instance.map = ; // 解析并绘制地图'
+            initMap(jsonData);
+            scene.add(instance.map);
+            resolve();
+          });
+        });
+
+      Promise.all([loadPersonResource(), loadBuildResource(), loadMap()]).then(
+        (res) => {
+          rendererSecee();
+        }
+      );
 
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
