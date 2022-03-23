@@ -53,6 +53,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 // import snowTexture from "./assets/logo.png";
 import snowTexture from "./assets/resource/snow.png";
 import Cloud from "./components/Cloud";
+import GunagDongMap from "./components/GunagDongMap";
 
 import Stats from "stats.js";
 // 控制组件
@@ -321,6 +322,8 @@ export default {
 
         controls.update();
         controls.enableDamping = true;
+        // 镜头动画
+        TWEEN && TWEEN.update();
         stats.end();
 
         var T = clock.getDelta(); //返回时间单位：秒

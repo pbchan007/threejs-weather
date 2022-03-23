@@ -4,10 +4,11 @@
  * @LastEditors: CPB
  * @Description: 
  */
-
+import * as THREE from "three";
 let loader = new THREE.FileLoader();
 
 loader.load('../assets/map/guangdong.json', function (data) {
+  console.log('data=============', data)
   let jsonData = JSON.parse(data);
 //   _this.initMap(jsonData); // 解析并绘制地图
 });
