@@ -7,28 +7,19 @@
 import * as THREE from "three";
 
 let loader = new THREE.FileLoader();
-export default class GunagDdongMap {
-  constructor() {
-    loader.load(
-      "/src/assets/map/guangdong.json",
-      (data) => {
-        let jsonData = JSON.parse(data);
-        this.instance = this.initMap(jsonData); // 解析并绘制地图
-      },
-      (value) => {
-        console.log("process", value);
-      },
-      (err) => {
-        console.log("err", err);
-      }
-    );
+export default class GunagDongMap {
+  constructor(jsonData) {
+    // this.instance = this.initMap(jsonData); // 解析并绘制地图
+    console.log("this.instance", this.initMap(jsonData));
+  }
+
+  setPosition(x, y, z) {
+    this.instance.position.set(x, y, z);
   }
 
   initMap(chinaJson) {
     // 建一个空对象存放对象
-    this.map = new THREE.Object3D();
-
-    let _this = this;
+    const map = new THREE.Object3D();
 
     // 墨卡托投影转换
     const projection = d3
@@ -39,8 +30,8 @@ export default class GunagDdongMap {
 
     chinaJson.features.forEach((elem) => {
       // 定一个省份3D对象
-      const province = new THREE.Object3D();
-     
+      const city = new THREE.Object3D();
+
       // 每个的 坐标 数组
       const coordinates = elem.geometry.coordinates;
       // 循环坐标数组
@@ -77,21 +68,21 @@ export default class GunagDdongMap {
           });
           const mesh = new THREE.Mesh(geometry, [material, material1]);
           const line = new THREE.Line(lineGeometry, lineMaterial);
-          province.add(mesh);
-          province.add(line);
+          city.add(mesh);
+          city.add(line);
         });
       });
-      
+
       // 将geo的属性放到省份模型中
-      province.properties = elem.properties;
+      city.properties = elem.properties;
       if (elem.properties.contorid) {
         const [x, y] = projection(elem.properties.contorid);
-        province.properties._centroid = [x, y];
+        city.properties._centroid = [x, y];
       }
-      
-      _this.map.add(province);
 
-      return _this.map 
+      map.add(city);
+
+      return (this.instance = map);
     });
   }
 }

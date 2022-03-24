@@ -8,6 +8,7 @@ import { ref, onMounted, getCurrentInstance } from "vue";
 import {
   Scene,
   PerspectiveCamera,
+  Vector2,
   Vector3,
   AxesHelper,
   PlaneGeometry,
@@ -43,6 +44,8 @@ import {
   Clock,
   TextureLoader,
   FileLoader,
+  // 射线追踪
+  Raycaster,
 } from "three";
 
 import { TWEEN } from "three/examples/jsm/libs/tween.module.min.js";
@@ -76,77 +79,6 @@ export default {
     const instance = getCurrentInstance();
     console.log("instance", instance);
 
-    const initMap = (chinaJson) => {
-      // 建一个空对象存放对象
-      instance.map = new Object3D();
-
-      // 墨卡托投影转换
-      const projection = d3
-        .geoMercator()
-        .center([104.0, 37.5])
-        .scale(80)
-        .translate([0, 0]);
-
-      chinaJson.features.forEach((elem) => {
-        // 定一个省份3D对象
-        const province = new Object3D();
-
-        // 每个的 坐标 数组
-        const coordinates = elem.geometry.coordinates;
-        // 循环坐标数组
-        coordinates.forEach((multiPolygon) => {
-          multiPolygon.forEach((polygon) => {
-            const shape = new Shape();
-            const lineMaterial = new LineBasicMaterial({
-              color: "white",
-            });
-            const lineGeometry = new Geometry();
-
-            for (let i = 0; i < polygon.length; i++) {
-              const [x, y] = projection(polygon[i]);
-              if (i === 0) {
-                shape.moveTo(x, -y);
-              }
-              shape.lineTo(x, -y);
-              lineGeometry.vertices.push(new Vector3(x, -y, 4.01));
-            }
-
-            const extrudeSettings = {
-              depth: 4,
-              bevelEnabled: false,
-            };
-
-            const geometry = new ExtrudeGeometry(shape, extrudeSettings);
-            const material = new MeshBasicMaterial({
-              color: "#02A1E2",
-              transparent: true,
-              opacity: 0.6,
-            });
-            const material1 = new MeshBasicMaterial({
-              color: "#3480C4",
-              transparent: true,
-              opacity: 0.5,
-            });
-            const mesh = new Mesh(geometry, [material, material1]);
-            const line = new Line(lineGeometry, lineMaterial);
-            province.add(mesh);
-            province.add(line);
-          });
-        });
-
-        // 将geo的属性放到省份模型中
-        province.properties = elem.properties;
-        if (elem.properties.contorid) {
-          const [x, y] = projection(elem.properties.contorid);
-          province.properties._centroid = [x, y];
-        }
-
-        instance.map.add(province);
-
-        return instance.map;
-      });
-    };
-
     // 帧率
     const initStats = () => {
       const stats = new Stats();
@@ -159,7 +91,7 @@ export default {
       return stats;
     };
 
-    const Options = function () {
+    const Options = function() {
       this.radius = 20;
       this.snow = 500;
     };
@@ -187,7 +119,7 @@ export default {
       const stats = initStats();
       const gui = initGUI();
       const scene = new Scene();
-
+      instance.scene = scene;
       // 坐标轴
       const axes = new AxesHelper(20);
       scene.add(axes);
@@ -289,7 +221,7 @@ export default {
       camera.position.x = -30;
       camera.position.y = 40;
       camera.position.z = 30;
-
+      instance.camera = camera;
       // 雪花
       // 雪花贴图
       const renderSnowPoint = () => {
@@ -344,13 +276,6 @@ export default {
       instance.renderClound = renderClound;
       renderClound();
 
-      // const proviceMap = new GunagDongMap();
-      // setTimeout(() => {
-      //   console.log("proviceMap", proviceMap);
-
-      //   scene.add(proviceMap.map);
-      // }, 3000);
-
       // 中央
       // camera.lookAt(new Vector3(0, 0, 0));
       camera.lookAt(scene.position);
@@ -387,7 +312,7 @@ export default {
           // 雪花动画
           let vertices = instance.points.geometry.vertices;
 
-          vertices.forEach(function (v) {
+          vertices.forEach(function(v) {
             v.y = v.y - v.velocityY;
             v.x = v.x - v.velocityX;
             if (v.y <= 0) v.y = 60;
@@ -401,6 +326,32 @@ export default {
           instance.clouds.forEach((cloud) => {
             cloud.animate();
           });
+
+          // 通过摄像机和鼠标位置更新射线
+          instance.raycaster.setFromCamera(instance.mouse, instance.camera);
+
+          // 算出射线 与当场景相交的对象有那些
+          const intersects = instance.raycaster.intersectObjects(
+            instance.scene.children,
+            true
+          );
+          // const find = intersects.find(
+          //   (item) => item.object.material && item.object.material.length === 2
+          // );
+
+          // 恢复上一次清空的
+          if (instance.lastPick) {
+            instance.lastPick.object.material[0].color.set("#2defff");
+            instance.lastPick.object.material[1].color.set("#3480C4");
+          }
+          instance.lastPick = null;
+          instance.lastPick = intersects.find(
+            (item) => item.object.material && item.object.material.length === 2
+          );
+          if (instance.lastPick) {
+            instance.lastPick.object.material[0].color.set(0xff0000);
+            instance.lastPick.object.material[1].color.set(0xff0000);
+          }
         };
         stats.begin();
         animate();
@@ -416,6 +367,15 @@ export default {
 
         renderer.render(scene, camera);
       };
+      // 人物
+      scene.add(instance.person);
+      // 水晶荒漠
+      scene.add(instance.gltf);
+      // 地图
+      const proviceMap = new GunagDongMap(instance.jsonData);
+      proviceMap.setPosition(6, 50, 6);
+      instance.proviceMap = proviceMap.instance;
+      scene.add(instance.proviceMap);
 
       instance.snowlyController.onChange((value) => {
         // 清除
@@ -426,11 +386,35 @@ export default {
         scene.add(instance.points);
       });
 
-      const gltfLoader = new GLTFLoader();
       // gltfLoader.setDRACOLoader(dracoLoader);
 
       let mixer = null;
 
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      });
+
+      const setRaycaster = () => {
+        instance.raycaster = new Raycaster();
+        instance.mouse = new Vector2();
+        const onMouseMove = (event) => {
+          // console.log("event", event);
+          // 将鼠标位置归一化为设备坐标。x 和 y 方向的取值范围是 (-1 to +1)
+          instance.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+          instance.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        };
+        window.addEventListener("mousemove", onMouseMove, false);
+      };
+      setRaycaster();
+
+      rendererSecee();
+    };
+
+    onMounted(() => {
+      const gltfLoader = new GLTFLoader();
       const loadPersonResource = () =>
         new Promise((resolve) => {
           gltfLoader.load(
@@ -444,11 +428,9 @@ export default {
               person.scene.castShadow = true;
               instance.person = person.scene;
 
-              scene.add(person.scene);
-
               resolve();
             },
-            function (xhr) {
+            function(xhr) {
               console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
             }
           );
@@ -466,11 +448,12 @@ export default {
               );
               gltf.scene.castShadow = true;
               gltf.scene.scale.set(5, 5, 5);
-              scene.add(gltf.scene);
+
+              instance.gltf = gltf.scene;
 
               resolve();
             },
-            function (xhr) {
+            function(xhr) {
               console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
             }
           );
@@ -480,30 +463,18 @@ export default {
         new Promise((resolve) => {
           loader.load("/src/assets/map/guangdong.json", (data) => {
             let jsonData = JSON.parse(data);
-            console.log("instance", instance);
+            console.log("instance", (instance.jsonData = jsonData));
             // instance.map = ; // 解析并绘制地图'
-            initMap(jsonData);
-            scene.add(instance.map);
+
             resolve();
           });
         });
 
       Promise.all([loadPersonResource(), loadBuildResource(), loadMap()]).then(
         (res) => {
-          rendererSecee();
+          init();
         }
       );
-
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      });
-    };
-
-    onMounted(() => {
-      init();
     });
 
     return {
